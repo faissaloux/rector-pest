@@ -6,6 +6,7 @@ namespace MrPunyapal\RectorPest\Rules;
 
 use MrPunyapal\RectorPest\AbstractRector;
 use PhpParser\Node;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Stmt\Expression;
@@ -48,18 +49,23 @@ CODE_SAMPLE
      */
     public function refactor(Node $node): ?Node
     {
-        if ($node->stmts === null) {
+        if (! property_exists($node, 'stmts') || $node->stmts === null) {
             return null;
         }
 
-        $hasChanged = false;
+        /** @var array<Node\Stmt> $stmts */
         $stmts = $node->stmts;
+        $hasChanged = false;
 
         // Keep processing until no more changes
         do {
             $changedInPass = false;
 
             foreach ($stmts as $key => $stmt) {
+                if (! is_int($key)) {
+                    continue;
+                }
+
                 if (! $stmt instanceof Expression) {
                     continue;
                 }
@@ -74,7 +80,7 @@ CODE_SAMPLE
                 }
 
                 $firstExpectArg = $this->getExpectArgument($methodCall);
-                if ($firstExpectArg === null) {
+                if (! $firstExpectArg instanceof Expr) {
                     continue;
                 }
 
@@ -97,7 +103,7 @@ CODE_SAMPLE
                 }
 
                 $nextExpectArg = $this->getExpectArgument($nextMethodCall);
-                if ($nextExpectArg === null) {
+                if (! $nextExpectArg instanceof Expr) {
                     continue;
                 }
 
@@ -111,6 +117,7 @@ CODE_SAMPLE
 
                 unset($stmts[$key + 1]);
 
+                /** @var array<Node\Stmt> $stmts */
                 $stmts = array_values($stmts);
 
                 $hasChanged = true;
@@ -149,7 +156,7 @@ CODE_SAMPLE
     /**
      * Get the argument from an expect() call
      */
-    private function getExpectArgument(MethodCall $methodCall): ?Node\Expr
+    private function getExpectArgument(MethodCall $methodCall): ?Expr
     {
         $current = $methodCall;
         while ($current->var instanceof MethodCall) {
@@ -169,13 +176,18 @@ CODE_SAMPLE
             return null;
         }
 
-        return $expectCall->args[0]->value;
+        $arg = $expectCall->args[0];
+        if (! $arg instanceof Node\Arg) {
+            return null;
+        }
+
+        return $arg->value;
     }
 
     /**
      * Build the chained method call with and()
      */
-    private function buildChainedCall(MethodCall $first, MethodCall $second, Node\Expr $expectArg): MethodCall
+    private function buildChainedCall(MethodCall $first, MethodCall $second, Expr $expectArg): MethodCall
     {
         $current = $second;
         $methods = [];

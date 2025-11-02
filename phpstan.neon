@@ -1,6 +1,3 @@
-includes:
-    - vendor/rector/rector/config/phpstan.neon
-
 parameters:
     level: max
     paths:

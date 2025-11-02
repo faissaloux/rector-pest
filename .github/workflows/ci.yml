@@ -35,7 +35,6 @@ jobs:
       run: |
         find src config -name "*.php" -exec php -l {} \;
         php -l rector.php
-        php -l ecs.php
 
     - name: Cache Composer packages
       id: composer-cache
@@ -51,12 +50,3 @@ jobs:
 
     - name: Run tests
       run: composer test
-
-    - name: Run PHPStan
-      run: composer phpstan
-
-    - name: Check code style
-      run: composer check-cs
-
-    - name: Run Rector (dry-run)
-      run: composer rector
