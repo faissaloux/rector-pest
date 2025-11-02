@@ -1,0 +1,15 @@
+includes:
+    - vendor/rector/rector/config/phpstan.neon
+
+parameters:
+    level: max
+    paths:
+        - src
+        - config
+        - tests
+
+    excludePaths:
+        - tests/Fixture
+        - tests/*/Fixture
+        - '*/Source/*'
+        - '*/Expected/*'
