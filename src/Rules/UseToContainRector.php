@@ -9,6 +9,7 @@ use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
@@ -121,12 +122,10 @@ CODE_SAMPLE
 
         // Build the new method call chain
         if ($needsNot) {
-            $notProperty = new Node\Expr\PropertyFetch($expectCall, 'not');
-            $newMethodCall = new MethodCall($notProperty, 'toContain', [new Arg($needleArg->value)]);
-        } else {
-            $newMethodCall = new MethodCall($expectCall, 'toContain', [new Arg($needleArg->value)]);
+            $notProperty = new PropertyFetch($expectCall, 'not');
+            return new MethodCall($notProperty, 'toContain', [new Arg($needleArg->value)]);
         }
 
-        return $newMethodCall;
+        return new MethodCall($expectCall, 'toContain', [new Arg($needleArg->value)]);
     }
 }

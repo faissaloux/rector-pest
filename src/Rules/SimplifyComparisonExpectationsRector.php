@@ -7,6 +7,7 @@ namespace MrPunyapal\RectorPest\Rules;
 use MrPunyapal\RectorPest\AbstractRector;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
+use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\BinaryOp\Greater;
 use PhpParser\Node\Expr\BinaryOp\GreaterOrEqual;
 use PhpParser\Node\Expr\BinaryOp\Smaller;
@@ -73,13 +74,7 @@ CODE_SAMPLE
         }
 
         $expectArg = $this->getExpectArgument($node);
-
-        $result = $this->handleComparison($expectArg, $expectCall, $node);
-        if ($result !== null) {
-            return $result;
-        }
-
-        return null;
+        return $this->handleComparison($expectArg, $expectCall, $node);
     }
 
     private function handleComparison(mixed $expectArg, FuncCall $expectCall, MethodCall $node): ?MethodCall
@@ -104,8 +99,8 @@ CODE_SAMPLE
     }
 
     private function transformComparison(
-        \PhpParser\Node\Expr $left,
-        \PhpParser\Node\Expr $right,
+        Expr $left,
+        Expr $right,
         string $matcher,
         FuncCall $expectCall,
         MethodCall $node

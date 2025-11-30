@@ -108,12 +108,7 @@ abstract class AbstractRector extends BaseAbstractRector implements DocumentedRu
         while ($current instanceof MethodCall) {
             $current = $current->var;
         }
-
-        if ($current instanceof PropertyFetch && $this->isName($current, 'not')) {
-            return true;
-        }
-
-        return false;
+        return $current instanceof PropertyFetch && $this->isName($current, 'not');
     }
 
     /**

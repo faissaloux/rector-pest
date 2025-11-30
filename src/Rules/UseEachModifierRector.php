@@ -8,6 +8,7 @@ use MrPunyapal\RectorPest\AbstractRector;
 use PhpParser\Node;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Foreach_;
@@ -91,7 +92,7 @@ CODE_SAMPLE
         $expectCall->args[0] = $this->nodeFactory->createArg($node->expr);
 
         $methods = $this->collectChainMethods($methodCall);
-        $eachProperty = new Node\Expr\PropertyFetch($expectCall, 'each');
+        $eachProperty = new PropertyFetch($expectCall, 'each');
 
         $result = $this->rebuildMethodChain($eachProperty, $methods);
 

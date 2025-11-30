@@ -9,6 +9,7 @@ use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
@@ -118,7 +119,7 @@ CODE_SAMPLE
         }
 
         if ($needsNot) {
-            $notProperty = new Node\Expr\PropertyFetch($expectCall, 'not');
+            $notProperty = new PropertyFetch($expectCall, 'not');
 
             return new MethodCall($notProperty, 'toHaveProperty', [new Arg($propertyArg->value)]);
         }

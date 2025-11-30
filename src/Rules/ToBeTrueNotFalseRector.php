@@ -91,7 +91,7 @@ CODE_SAMPLE
 
         $methods = $this->collectChainMethods($methodCall);
 
-        if (count($methods) > 0) {
+        if ($methods !== []) {
             $lastIndex = count($methods) - 1;
             $methods[$lastIndex] = [
                 'name' => new Identifier($newMatcher),

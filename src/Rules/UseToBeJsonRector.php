@@ -98,7 +98,7 @@ CODE_SAMPLE
 
         /** @var Identical|NotIdentical $comparison */
         $jsonDecodeCall = $this->extractJsonDecodeCall($comparison);
-        if ($jsonDecodeCall === null) {
+        if (!$jsonDecodeCall instanceof FuncCall) {
             return null;
         }
 
@@ -150,7 +150,7 @@ CODE_SAMPLE
             $funcCall = $comparison->right;
         }
 
-        if ($funcCall === null) {
+        if (!$funcCall instanceof FuncCall) {
             return null;
         }
 

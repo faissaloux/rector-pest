@@ -105,7 +105,7 @@ CODE_SAMPLE
             }
         }
 
-        if ($value instanceof Array_ && count($value->items) === 0) {
+        if ($value instanceof Array_ && $value->items === []) {
             return 'toBeEmpty';
         }
 

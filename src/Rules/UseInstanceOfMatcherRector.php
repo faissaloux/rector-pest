@@ -7,6 +7,7 @@ namespace MrPunyapal\RectorPest\Rules;
 use MrPunyapal\RectorPest\AbstractRector;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
+use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\Instanceof_;
 use PhpParser\Node\Expr\MethodCall;
@@ -80,7 +81,7 @@ CODE_SAMPLE
 
         $expectCall->args = [new Arg($object)];
 
-        $classConstFetch = new \PhpParser\Node\Expr\ClassConstFetch($class, new Identifier('class'));
+        $classConstFetch = new ClassConstFetch($class, new Identifier('class'));
         $node->name = new Identifier('toBeInstanceOf');
         $node->args = [new Arg($classConstFetch)];
 
