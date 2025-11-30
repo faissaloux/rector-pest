@@ -78,77 +78,19 @@ CODE_SAMPLE
         return $this->addNotModifier($node);
     }
 
-    /**
-     * Check if a method call is an expect() chain
-     */
-    private function isExpectChain(MethodCall $methodCall): bool
-    {
-        $current = $methodCall;
-        while ($current->var instanceof MethodCall) {
-            $current = $current->var;
-        }
-
-        if (! $current->var instanceof FuncCall) {
-            return false;
-        }
-
-        return $this->isName($current->var, 'expect');
-    }
-
-    /**
-     * Get the expect() function call from the method chain
-     */
-    private function getExpectFuncCall(MethodCall $methodCall): ?FuncCall
-    {
-        $current = $methodCall;
-        while ($current->var instanceof MethodCall) {
-            $current = $current->var;
-        }
-
-        if (! $current->var instanceof FuncCall) {
-            return null;
-        }
-
-        if (! $this->isName($current->var, 'expect')) {
-            return null;
-        }
-
-        return $current->var;
-    }
-
-    /**
-     * Add not() modifier after expect() call
-     */
     private function addNotModifier(MethodCall $methodCall): MethodCall
     {
-        $current = $methodCall;
-        $chain = [];
-
-        while ($current instanceof MethodCall) {
-            if ($current->var instanceof FuncCall && $this->isName($current->var, 'expect')) {
-                $chain[] = [
-                    'name' => $current->name,
-                    'args' => $current->args,
-                ];
-                break;
-            }
-
-            $chain[] = [
-                'name' => $current->name,
-                'args' => $current->args,
-            ];
-
-            $current = $current->var;
+        $expectCall = $this->getExpectFuncCall($methodCall);
+        if (! $expectCall instanceof FuncCall) {
+            return $methodCall;
         }
 
-        $chain = array_reverse($chain);
+        $methods = $this->collectChainMethods($methodCall);
+        $notProperty = new PropertyFetch($expectCall, 'not');
 
-        $result = new PropertyFetch($current->var, 'not');
+        $result = $this->rebuildMethodChain($notProperty, $methods);
 
-        foreach ($chain as $method) {
-            $result = new MethodCall($result, $method['name'], $method['args']);
-        }
-
+        /** @var MethodCall $result */
         return $result;
     }
 }
