@@ -35,7 +35,7 @@ return RectorConfig::configure()
 | Rule | Description |
 |------|-------------|
 | `ChainExpectCallsRector` | Chains multiple `expect()` calls on the same value into a single chained call (e.g. `expect($value)->toBe(10)->toBeInt()`) |
-| `SimplifyExpectNotRector` | Converts `expect(!$x)->toBeTrue()` to `expect($x)->not->toBeTrue()` |
+| `SimplifyExpectNotRector` | Converts `expect(!$x)->toBeTrue()` to `expect($x)->toBeFalse()` (flips matcher) |
 | `ToBeTrueNotFalseRector` | Simplifies `->not->toBeFalse()` to `->toBeTrue()` and vice versa |
 | `UseEachModifierRector` | Converts `foreach` loops with `expect()` to `->each` modifier |
 | `SimplifyToLiteralBooleanRector` | Converts `->toBe(true)` to `->toBeTrue()` (and `false`, `null`, `[]`) |
@@ -132,9 +132,11 @@ expect($value)->toBe(10)->toBeInt();
 ```php
 // Before
 expect(!$condition)->toBeTrue();
+expect(!$value)->toBeFalse();
 
 // After
-expect($condition)->not->toBeTrue();
+expect($condition)->toBeFalse();
+expect($value)->toBeTrue();
 ```
 
 ### ToBeTrueNotFalseRector

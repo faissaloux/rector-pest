@@ -20,4 +20,9 @@ expect(!$a || $b)->toBeTrue();
 
 expect(someFunction(!$condition))->toBeTrue();
 
+// Non-flippable matchers with negation - should NOT be changed
+expect(!$value)->toBe(false);
+expect(!$value)->toBe(10);
+expect(!$value)->toEqual('test');
+
 ?>

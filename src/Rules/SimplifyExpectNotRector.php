@@ -10,26 +10,46 @@ use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\BooleanNot;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
-use PhpParser\Node\Expr\PropertyFetch;
+use PhpParser\Node\Identifier;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
 use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
+/**
+ * Simplifies negated expectations by flipping the matcher method.
+ *
+ * Converts expect(!$x)->toBeTrue() to expect($x)->toBeFalse()
+ * and expect(!$x)->toBeFalse() to expect($x)->toBeTrue().
+ */
 final class SimplifyExpectNotRector extends AbstractRector
 {
+    /**
+     * Map of matcher methods that can be flipped when negation is removed.
+     *
+     * @var array<string, string>
+     */
+    private const FLIPPABLE_MATCHERS = [
+        'toBeTrue' => 'toBeFalse',
+        'toBeFalse' => 'toBeTrue',
+        'toBeEmpty' => 'toBeNotEmpty',
+        'toBeNotEmpty' => 'toBeEmpty',
+        'toBeNull' => 'toBeNotNull',
+        'toBeNotNull' => 'toBeNull',
+    ];
+
     public function getRuleDefinition(): RuleDefinition
     {
         return new RuleDefinition(
-            "Simplifies negated expectations by using Pest's built-in not modifier instead of manual negations",
+            'Simplifies negated expectations by flipping the matcher (e.g., expect(!$x)->toBeTrue() becomes expect($x)->toBeFalse())',
             [
                 new CodeSample(
                     <<<'CODE_SAMPLE'
 expect(!$condition)->toBeTrue();
-expect(!$value)->toBe(false);
+expect(!$value)->toBeFalse();
 CODE_SAMPLE
                     ,
                     <<<'CODE_SAMPLE'
-expect($condition)->not->toBeTrue();
-expect($value)->not->toBe(false);
+expect($condition)->toBeFalse();
+expect($value)->toBeTrue();
 CODE_SAMPLE
                 ),
             ]
@@ -71,26 +91,39 @@ CODE_SAMPLE
             return null;
         }
 
-        $negatedExpression = $arg->value->expr;
-
-        $expectCall->args[0] = $this->nodeFactory->createArg($negatedExpression);
-
-        return $this->addNotModifier($node);
-    }
-
-    private function addNotModifier(MethodCall $methodCall): MethodCall
-    {
-        $expectCall = $this->getExpectFuncCall($methodCall);
-        if (! $expectCall instanceof FuncCall) {
-            return $methodCall;
+        // Get the final method call in the chain to check if it's flippable
+        $finalMethodName = $this->getFinalMethodName($node);
+        if ($finalMethodName === null || ! isset(self::FLIPPABLE_MATCHERS[$finalMethodName])) {
+            return null;
         }
 
-        $methods = $this->collectChainMethods($methodCall);
-        $notProperty = new PropertyFetch($expectCall, 'not');
+        // Remove the negation from expect() argument
+        $negatedExpression = $arg->value->expr;
+        $expectCall->args[0] = $this->nodeFactory->createArg($negatedExpression);
 
-        $result = $this->rebuildMethodChain($notProperty, $methods);
+        // Flip the matcher method
+        $this->flipFinalMatcher($node, self::FLIPPABLE_MATCHERS[$finalMethodName]);
 
-        /** @var MethodCall $result */
-        return $result;
+        return $node;
+    }
+
+    /**
+     * Get the name of the final method in the expect chain.
+     */
+    private function getFinalMethodName(MethodCall $methodCall): ?string
+    {
+        if (! $methodCall->name instanceof Identifier) {
+            return null;
+        }
+
+        return $methodCall->name->name;
+    }
+
+    /**
+     * Flip the final matcher method to its opposite.
+     */
+    private function flipFinalMatcher(MethodCall $methodCall, string $newMethodName): void
+    {
+        $methodCall->name = new Identifier($newMethodName);
     }
 }
