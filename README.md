@@ -34,7 +34,7 @@ return RectorConfig::configure()
 
 | Rule | Description |
 |------|-------------|
-| `ChainExpectCallsRector` | Chains multiple `expect()` calls on the same value using `->and()` |
+| `ChainExpectCallsRector` | Chains multiple `expect()` calls on the same value into a single chained call (e.g. `expect($value)->toBe(10)->toBeInt()`) |
 | `SimplifyExpectNotRector` | Converts `expect(!$x)->toBeTrue()` to `expect($x)->not->toBeTrue()` |
 | `ToBeTrueNotFalseRector` | Simplifies `->not->toBeFalse()` to `->toBeTrue()` and vice versa |
 | `UseEachModifierRector` | Converts `foreach` loops with `expect()` to `->each` modifier |
@@ -124,8 +124,7 @@ expect($value)->toBe(10);
 expect($value)->toBeInt();
 
 // After
-expect($value)->toBe(10)
-    ->and($value)->toBeInt();
+expect($value)->toBe(10)->toBeInt();
 ```
 
 ### SimplifyExpectNotRector
