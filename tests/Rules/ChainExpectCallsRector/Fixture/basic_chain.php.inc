@@ -14,7 +14,7 @@ test('basic example', function () {
 test('basic example', function () {
     $value = 10;
 
-    expect($value)->toBe(10)->and($value)->toBeInt();
+    expect($value)->toBe(10)->toBeInt();
 });
 
 ?>

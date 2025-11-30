@@ -18,7 +18,7 @@ final class ChainExpectCallsRector extends AbstractRector
     public function getRuleDefinition(): RuleDefinition
     {
         return new RuleDefinition(
-            'Converts multiple expect() calls into chained calls using and()',
+            'Chains multiple expect() calls on the same value into a single chained expectation',
             [
                 new CodeSample(
                     <<<'CODE_SAMPLE'
@@ -27,8 +27,9 @@ expect($value)->toBeInt();
 CODE_SAMPLE
                     ,
                     <<<'CODE_SAMPLE'
-expect($value)->toBe(10)
-    ->and($value)->toBeInt();
+expect($value)
+    ->toBe(10)
+    ->toBeInt();
 CODE_SAMPLE
                 ),
             ]
@@ -109,7 +110,7 @@ CODE_SAMPLE
                     continue;
                 }
 
-                $chainedCall = $this->buildChainedCall($methodCall, $nextMethodCall, $nextExpectArg);
+                $chainedCall = $this->buildChainedCall($methodCall, $nextMethodCall);
 
                 $stmt->expr = $chainedCall;
 
@@ -134,13 +135,11 @@ CODE_SAMPLE
         return $node;
     }
 
-    private function buildChainedCall(MethodCall $first, MethodCall $second, Expr $expectArg): MethodCall
+    private function buildChainedCall(MethodCall $first, MethodCall $second): MethodCall
     {
-        $methods = $this->collectChainMethods($second);
+        $secondMethods = $this->collectChainMethods($second);
 
-        $andCall = new MethodCall($first, 'and', [$this->nodeFactory->createArg($expectArg)]);
-
-        $result = $this->rebuildMethodChain($andCall, $methods);
+        $result = $this->rebuildMethodChain($first, $secondMethods);
 
         /** @var MethodCall $result */
         return $result;

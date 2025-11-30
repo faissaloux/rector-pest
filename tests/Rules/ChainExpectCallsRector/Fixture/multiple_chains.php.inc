@@ -15,7 +15,7 @@ test('multiple chains', function () {
 test('multiple chains', function () {
     $value = 10;
 
-    expect($value)->toBe(10)->and($value)->toBeInt()->and($value)->toBeGreaterThan(5);
+    expect($value)->toBe(10)->toBeInt()->toBeGreaterThan(5);
 });
 
 ?>
