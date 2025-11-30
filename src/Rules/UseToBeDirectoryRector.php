@@ -1,0 +1,126 @@
+<?php
+
+declare(strict_types=1);
+
+namespace MrPunyapal\RectorPest\Rules;
+
+use MrPunyapal\RectorPest\AbstractRector;
+use PhpParser\Node;
+use PhpParser\Node\Arg;
+use PhpParser\Node\Expr\FuncCall;
+use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\PropertyFetch;
+use PhpParser\Node\Identifier;
+use PhpParser\Node\Name;
+use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
+use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
+
+/**
+ * Converts is_dir() checks to Pest's toBeDirectory() matcher.
+ *
+ * Before: expect(is_dir($path))->toBeTrue()
+ * After:  expect($path)->toBeDirectory()
+ */
+final class UseToBeDirectoryRector extends AbstractRector
+{
+    public function getRuleDefinition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            'Converts is_dir() checks to toBeDirectory() matcher',
+            [
+                new CodeSample(
+                    <<<'CODE_SAMPLE'
+expect(is_dir($path))->toBeTrue();
+expect(is_dir('/tmp'))->toBeTrue();
+CODE_SAMPLE
+                    ,
+                    <<<'CODE_SAMPLE'
+expect($path)->toBeDirectory();
+expect('/tmp')->toBeDirectory();
+CODE_SAMPLE
+                ),
+            ]
+        );
+    }
+
+    /**
+     * @return array<class-string<Node>>
+     */
+    public function getNodeTypes(): array
+    {
+        return [MethodCall::class];
+    }
+
+    /**
+     * @param MethodCall $node
+     */
+    public function refactor(Node $node): ?Node
+    {
+        if (! $this->isExpectChain($node)) {
+            return null;
+        }
+
+        if (! $node->name instanceof Identifier) {
+            return null;
+        }
+
+        $methodName = $node->name->name;
+
+        if ($methodName !== 'toBeTrue' && $methodName !== 'toBeFalse') {
+            return null;
+        }
+
+        $expectCall = $this->getExpectFuncCall($node);
+        if (! $expectCall instanceof FuncCall) {
+            return null;
+        }
+
+        if (! isset($expectCall->args[0])) {
+            return null;
+        }
+
+        $arg = $expectCall->args[0];
+        if (! $arg instanceof Arg) {
+            return null;
+        }
+
+        if (! $arg->value instanceof FuncCall) {
+            return null;
+        }
+
+        $funcCall = $arg->value;
+        if (! $funcCall->name instanceof Name) {
+            return null;
+        }
+
+        if ($funcCall->name->toString() !== 'is_dir') {
+            return null;
+        }
+
+        if (count($funcCall->args) !== 1) {
+            return null;
+        }
+
+        $pathArg = $funcCall->args[0];
+        if (! $pathArg instanceof Arg) {
+            return null;
+        }
+
+        // Update expect() to use the path directly
+        $expectCall->args[0] = new Arg($pathArg->value);
+
+        // Check if we need ->not
+        $needsNot = $methodName === 'toBeFalse';
+        if ($this->hasNotModifier($node)) {
+            $needsNot = ! $needsNot;
+        }
+
+        if ($needsNot) {
+            $notProperty = new PropertyFetch($expectCall, 'not');
+
+            return new MethodCall($notProperty, 'toBeDirectory');
+        }
+
+        return new MethodCall($expectCall, 'toBeDirectory');
+    }
+}
