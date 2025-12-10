@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+
 use Rector\Testing\Fixture\FixtureFileFinder;
 
 beforeAll(function () {
