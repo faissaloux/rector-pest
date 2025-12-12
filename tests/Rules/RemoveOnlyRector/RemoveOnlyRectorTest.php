@@ -2,27 +2,14 @@
 
 declare(strict_types=1);
 
-namespace MrPunyapal\RectorPest\Tests\Rules\SimplifyComparisonExpectationsRector;
+use Rector\Testing\Fixture\FixtureFileFinder;
 
-use Iterator;
-use PHPUnit\Framework\Attributes\DataProvider;
-use Rector\Testing\PHPUnit\AbstractRectorTestCase;
+beforeAll(function (): void {
+    self::$configFilePath = __DIR__ . '/config/configured_rule.php';
+});
 
-final class RemoveOnlyRectorTest extends AbstractRectorTestCase
-{
-    #[DataProvider('provideData')]
-    public function test(string $filePath): void
-    {
-        $this->doTestFile($filePath);
-    }
-
-    public static function provideData(): Iterator
-    {
-        return self::yieldFilesFromDirectory(__DIR__ . '/Fixture');
-    }
-
-    public function provideConfigFilePath(): string
-    {
-        return __DIR__ . '/config/configured_rule.php';
-    }
-}
+test('', function (string $filePath): void {
+    $this->doTestFile($filePath);
+})->with(
+    fn (): Iterator => FixtureFileFinder::yieldDirectory(__DIR__ . '/Fixture')
+);
