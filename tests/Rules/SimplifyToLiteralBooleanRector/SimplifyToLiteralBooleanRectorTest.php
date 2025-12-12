@@ -10,4 +10,6 @@ beforeAll(function (): void {
 
 test('', function (string $filePath): void {
     $this->doTestFile($filePath);
-})->with(fn (): Iterator => FixtureFileFinder::yieldDirectory(__DIR__ . '/Fixture'));
+})->with(
+    fn (): Iterator => FixtureFileFinder::yieldDirectory(__DIR__ . '/Fixture')
+);
