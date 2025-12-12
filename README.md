@@ -6,7 +6,7 @@ Rector rules for [PestPHP](https://pestphp.com/) to improve code quality and hel
 
 ## Available Rules
 
-See all available Pest rules [here](/docs/rector_rules_overview.md).
+See all available Pest rules [here](/docs/rules.md).
 
 ## Installation
 
