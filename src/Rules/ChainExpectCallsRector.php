@@ -23,14 +23,34 @@ final class ChainExpectCallsRector extends AbstractRector
             [
                 new CodeSample(
                     <<<'CODE_SAMPLE'
-expect($value)->toBe(10);
-expect($value)->toBeInt();
+expect($a)->toBe(10);
+expect($a)->toBeInt();
 CODE_SAMPLE
                     ,
                     <<<'CODE_SAMPLE'
-expect($value)
-    ->toBe(10)
-    ->toBeInt();
+expect($a)->toBe(10)->toBeInt();
+CODE_SAMPLE
+                ),
+                new CodeSample(
+                    <<<'CODE_SAMPLE'
+expect($a)->toBe(10);
+expect($b)->toBe(10);
+CODE_SAMPLE
+                    ,
+                    <<<'CODE_SAMPLE'
+expect($a)->toBe(10)->and($b)->toBe(10);
+CODE_SAMPLE
+                ),
+                new CodeSample(
+                    <<<'CODE_SAMPLE'
+expect($a)->toBe(10);
+expect($a)->toBeInt();
+expect($b)->toBe(10);
+expect($b)->toBeInt();
+CODE_SAMPLE
+                    ,
+                    <<<'CODE_SAMPLE'
+expect($a)->toBe(10)->toBeInt()->and($b)->toBe(10)->toBeInt();
 CODE_SAMPLE
                 ),
             ]
@@ -107,23 +127,23 @@ CODE_SAMPLE
                     continue;
                 }
 
-                if (! $this->nodeComparator->areNodesEqual($firstExpectArg, $nextExpectArg)) {
-                    continue;
+                // same variable: merge methods into a single expect() chain
+                if ($this->nodeComparator->areNodesEqual($firstExpectArg, $nextExpectArg)) {
+                    $this->mergeSameVariable($stmts, $key);
+
+                    $hasChanged = true;
+                    $changedInPass = true;
+
+                    break;
                 }
 
-                $chainedCall = $this->buildChainedCall($methodCall, $nextMethodCall);
+                // different variables: try to merge the following expect() chains into a single ->and(...) chain
+                if ($this->mergeDifferentVariableChains($stmts, $key)) {
+                    $hasChanged = true;
+                    $changedInPass = true;
 
-                $stmt->expr = $chainedCall;
-
-                unset($stmts[$key + 1]);
-
-                /** @var array<Node\Stmt> $stmts */
-                $stmts = array_values($stmts);
-
-                $hasChanged = true;
-                $changedInPass = true;
-
-                break;
+                    break;
+                }
             }
         } while ($changedInPass);
 
@@ -144,5 +164,99 @@ CODE_SAMPLE
 
         /** @var MethodCall $result */
         return $result;
+    }
+
+    /**
+     * @param array<Node\Stmt> $stmts
+     */
+    private function mergeSameVariable(array &$stmts, int $key): void
+    {
+        /** @var Expression $exprStmt */
+        $exprStmt = $stmts[$key];
+        /** @var Expression $nextExprStmt */
+        $nextExprStmt = $stmts[$key + 1];
+
+        $first = $exprStmt->expr;
+        $second = $nextExprStmt->expr;
+
+        /** @var MethodCall $first */
+        /** @var MethodCall $second */
+        $exprStmt->expr = $this->buildChainedCall($first, $second);
+
+        unset($stmts[$key + 1]);
+        $stmts = array_values($stmts);
+    }
+
+    /**
+     * @param array<Node\Stmt> $stmts
+     */
+    private function mergeDifferentVariableChains(array &$stmts, int $key): bool
+    {
+        /** @var Expression $exprStmt */
+        $exprStmt = $stmts[$key];
+        /** @var Expression $nextExprStmt */
+        $nextExprStmt = $stmts[$key + 1];
+
+        $firstMethodCall = $exprStmt->expr;
+        $nextMethodCall = $nextExprStmt->expr;
+
+        /** @var MethodCall $firstMethodCall */
+        /** @var MethodCall $nextMethodCall */
+
+        $targetExpectArg = $this->getExpectArgument($nextMethodCall);
+        if (! $targetExpectArg instanceof Expr) {
+            return false;
+        }
+
+        $collectIndex = $key + 1;
+        $allSecondMethods = [];
+
+        while (isset($stmts[$collectIndex])) {
+            $currStmt = $stmts[$collectIndex];
+
+            if (! $currStmt instanceof Expression) {
+                break;
+            }
+
+            if (! $currStmt->expr instanceof MethodCall) {
+                break;
+            }
+
+            $currMethodCall = $currStmt->expr;
+            /** @var MethodCall $currMethodCall */
+            if (! $this->isExpectChain($currMethodCall)) {
+                break;
+            }
+
+            $currExpectArg = $this->getExpectArgument($currMethodCall);
+            if (! $currExpectArg instanceof Expr) {
+                break;
+            }
+
+            if (! $this->nodeComparator->areNodesEqual($targetExpectArg, $currExpectArg)) {
+                break;
+            }
+
+            $methods = $this->collectChainMethods($currMethodCall);
+            $allSecondMethods = array_merge($allSecondMethods, $methods);
+
+            unset($stmts[$collectIndex]);
+            $collectIndex++;
+        }
+
+        if ($allSecondMethods === []) {
+            return false;
+        }
+
+        $andArg = new Node\Arg($targetExpectArg);
+        $andCall = new MethodCall($firstMethodCall, 'and', [$andArg]);
+
+        $result = $this->rebuildMethodChain($andCall, $allSecondMethods);
+
+        $exprStmt->expr = $result;
+
+        $stmts = array_values($stmts);
+
+        return true;
     }
 }
