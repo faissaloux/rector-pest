@@ -1,0 +1,216 @@
+<?php
+
+declare(strict_types=1);
+
+namespace RectorPest\Rules;
+
+use PhpParser\Node;
+use PhpParser\Node\Arg;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Stmt\Expression;
+use Rector\PhpParser\Enum\NodeGroup;
+use RectorPest\AbstractRector;
+use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
+use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
+
+final class EnsureTypeChecksFirstRector extends AbstractRector
+{
+    /**
+     * @var string[]
+     */
+    public static array $typeMatchers = [
+        'toBeInt', 'toBeString', 'toBeArray', 'toBeFloat', 'toBeBool',
+        'toBeNull', 'toBeInstanceOf', 'toBeNumeric', 'toBeIterable',
+        'toBeCallable', 'toBeObject', 'toBeScalar', 'toBeResource',
+    ];
+
+    public function getRuleDefinition(): RuleDefinition
+    {
+        return new RuleDefinition(
+            'Ensure type-check matchers (e.g. toBeInt, toBeInstanceOf) appear before value assertions in expect() chains and consecutive expects',
+            [
+                new CodeSample(
+                    <<<'CODE_SAMPLE'
+<?php
+expect($a)->toBe(10)->toBeInt();
+CODE_SAMPLE
+                    ,
+                    <<<'CODE_SAMPLE'
+<?php
+expect($a)->toBeInt()->toBe(10);
+CODE_SAMPLE
+                ),
+                new CodeSample(
+                    <<<'CODE_SAMPLE'
+<?php
+expect($a)->toBe(10);
+expect($a)->toBeInt();
+CODE_SAMPLE
+                    ,
+                    <<<'CODE_SAMPLE'
+<?php
+expect($a)->toBeInt();
+expect($a)->toBe(10);
+CODE_SAMPLE
+                ),
+            ]
+        );
+    }
+
+    /**
+     * @return array<class-string<Node>>
+     */
+    public function getNodeTypes(): array
+    {
+        return NodeGroup::STMTS_AWARE;
+    }
+
+    /**
+     * @param Node&object $node
+     */
+    public function refactor(Node $node): ?Node
+    {
+        if (! property_exists($node, 'stmts') || $node->stmts === null) {
+            return null;
+        }
+
+        /** @var array<Node\Stmt> $stmts */
+        $stmts = $node->stmts;
+        $hasChanged = false;
+
+        foreach ($stmts as $key => $stmt) {
+            if (! is_int($key)) {
+                continue;
+            }
+
+            if (! $stmt instanceof Expression) {
+                continue;
+            }
+
+            if (! $stmt->expr instanceof MethodCall) {
+                continue;
+            }
+
+            $methodCall = $stmt->expr;
+            if (! $this->isExpectChain($methodCall)) {
+                continue;
+            }
+
+            if ($this->hasNotModifier($methodCall)) {
+                continue;
+            }
+
+            $methods = $this->collectChainMethods($methodCall);
+            if ($methods === []) {
+                continue;
+            }
+
+            $partitioned = $this->partitionTypeAndNonType($methods);
+
+            // if any type method appears after a non-type method, reorder within the same chain
+            if ($this->needsReorderWithin($methods, $partitioned)) {
+                $root = $this->getExpectChainRoot($methodCall);
+                if (! $root instanceof Expr) {
+                    continue;
+                }
+
+                $newMethods = array_merge($partitioned['type'], $partitioned['non_type']);
+                $stmt->expr = $this->rebuildMethodChain($root, $newMethods);
+                $hasChanged = true;
+                continue;
+            }
+
+            // handle consecutive expect statements on same subject: swap so type-only comes first
+            if (isset($stmts[$key + 1]) && $stmts[$key + 1] instanceof Expression) {
+                $next = $stmts[$key + 1];
+                if ($next->expr instanceof MethodCall && $this->isExpectChain($next->expr) && ! $this->hasNotModifier($next->expr)) {
+                    $firstArg = $this->getExpectArgument($methodCall);
+                    $secondArg = $this->getExpectArgument($next->expr);
+                    if ($firstArg instanceof Expr && $secondArg instanceof Expr && $this->nodeComparator->areNodesEqual($firstArg, $secondArg)) {
+                        $firstPartition = $this->partitionTypeAndNonType($this->collectChainMethods($methodCall));
+                        $secondPartition = $this->partitionTypeAndNonType($this->collectChainMethods($next->expr));
+
+                        $firstHasOnlyNonType = $firstPartition['type'] === [] && $firstPartition['non_type'] !== [];
+                        $secondHasType = $secondPartition['type'] !== [];
+
+                        if ($firstHasOnlyNonType && $secondHasType) {
+                            // swap statements
+                            $stmts[$key] = $next;
+                            $stmts[$key + 1] = $stmt;
+                            $hasChanged = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (! $hasChanged) {
+            return null;
+        }
+
+        $node->stmts = array_values($stmts);
+
+        return $node;
+    }
+
+    /**
+     * Partition collected methods into type vs non-type preserving original order
+     *
+     * @param array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg>>>
+     * @return array{type: array, non_type: array}
+     */
+    private function partitionTypeAndNonType(array $methods): array
+    {
+        $type = [];
+        $nonType = [];
+
+        foreach ($methods as $m) {
+            $name = $this->getName($m['name']);
+            if ($name !== null && $this->isTypeMatcherName($name)) {
+                $type[] = $m;
+            } else {
+                $nonType[] = $m;
+            }
+        }
+
+        return ['type' => $type, 'non_type' => $nonType];
+    }
+
+    /**
+     * Determine if the original ordering requires reordering within the same chain
+     *
+     * @param array $orig
+     * @param array{type: array, non_type: array} $partitioned
+     */
+    private function needsReorderWithin(array $orig, array $partitioned): bool
+    {
+        if ($partitioned['type'] === [] || $partitioned['non_type'] === []) {
+            return false;
+        }
+
+        // if a type matcher appears after a non-type matcher in original order => reorder
+        $foundNonType = false;
+        foreach ($orig as $m) {
+            $name = $this->getName($m['name']);
+            if ($name === null) {
+                continue;
+            }
+
+            if ($this->isTypeMatcherName($name)) {
+                if ($foundNonType) {
+                    return true;
+                }
+            } else {
+                $foundNonType = true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isTypeMatcherName(string $name): bool
+    {
+        return in_array($name, self::$typeMatchers, true);
+    }
+}
