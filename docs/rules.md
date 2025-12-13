@@ -1,4 +1,4 @@
-# 24 Rules Overview
+# 25 Rules Overview
 
 ## ChainExpectCallsRector
 
@@ -28,6 +28,30 @@ Chains multiple `expect()` calls on the same value into a single chained expecta
 -expect($b)->toBe(10);
 -expect($b)->toBeInt();
 +expect($a)->toBe(10)->toBeInt()->and($b)->toBe(10)->toBeInt();
+```
+
+<br>
+
+## EnsureTypeChecksFirstRector
+
+Ensure type-check matchers (e.g. toBeInt, toBeInstanceOf) appear before value assertions in `expect()` chains and consecutive expects
+
+- class: [`RectorPest\Rules\EnsureTypeChecksFirstRector`](../src/Rules/EnsureTypeChecksFirstRector.php)
+
+```diff
+ <?php
+-expect($a)->toBe(10)->toBeInt();
++expect($a)->toBeInt()->toBe(10);
+```
+
+<br>
+
+```diff
+ <?php
+-expect($a)->toBe(10);
+-expect($a)->toBeInt();
++expect($a)->toBeInt();
++expect($a)->toBe(10);
 ```
 
 <br>
