@@ -9,6 +9,7 @@ use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Stmt\Expression;
+use PhpParser\Node\VariadicPlaceholder;
 use Rector\PhpParser\Enum\NodeGroup;
 use RectorPest\AbstractRector;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
@@ -153,8 +154,8 @@ CODE_SAMPLE
     /**
      * Partition collected methods into type vs non-type preserving original order
      *
-     * @param array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg>>>
-     * @return array{type: array, non_type: array}
+     * @param array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}> $methods
+     * @return array{type: array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}>, non_type: array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}>}
      */
     private function partitionTypeAndNonType(array $methods): array
     {
@@ -162,7 +163,14 @@ CODE_SAMPLE
         $nonType = [];
 
         foreach ($methods as $m) {
-            $name = $this->getName($m['name']);
+            $nameValue = $m['name'];
+            if ($nameValue instanceof Node) {
+                $name = $this->getName($nameValue);
+            } else {
+                // $nameValue is string
+                $name = $nameValue;
+            }
+
             if ($name !== null && $this->isTypeMatcherName($name)) {
                 $type[] = $m;
             } else {
@@ -176,8 +184,8 @@ CODE_SAMPLE
     /**
      * Determine if the original ordering requires reordering within the same chain
      *
-     * @param array $orig
-     * @param array{type: array, non_type: array} $partitioned
+     * @param array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}> $orig
+     * @param array{type: array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}>, non_type: array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}>} $partitioned
      */
     private function needsReorderWithin(array $orig, array $partitioned): bool
     {
@@ -188,7 +196,14 @@ CODE_SAMPLE
         // if a type matcher appears after a non-type matcher in original order => reorder
         $foundNonType = false;
         foreach ($orig as $m) {
-            $name = $this->getName($m['name']);
+            $nameValue = $m['name'];
+            if ($nameValue instanceof Node) {
+                $name = $this->getName($nameValue);
+            } else {
+                // $nameValue is string
+                $name = $nameValue;
+            }
+
             if ($name === null) {
                 continue;
             }
