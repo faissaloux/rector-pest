@@ -32,24 +32,20 @@ final class EnsureTypeChecksFirstRector extends AbstractRector
             [
                 new CodeSample(
                     <<<'CODE_SAMPLE'
-<?php
 expect($a)->toBe(10)->toBeInt();
 CODE_SAMPLE
                     ,
                     <<<'CODE_SAMPLE'
-<?php
 expect($a)->toBeInt()->toBe(10);
 CODE_SAMPLE
                 ),
                 new CodeSample(
                     <<<'CODE_SAMPLE'
-<?php
 expect($a)->toBe(10);
 expect($a)->toBeInt();
 CODE_SAMPLE
                     ,
                     <<<'CODE_SAMPLE'
-<?php
 expect($a)->toBeInt();
 expect($a)->toBe(10);
 CODE_SAMPLE
