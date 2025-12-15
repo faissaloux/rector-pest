@@ -131,7 +131,11 @@ CODE_SAMPLE
                 // don't merge across comments — preserve explicit separation
                 $currentComments = (array) $stmt->getAttribute('comments', []);
                 $nextComments = (array) $nextStmt->getAttribute('comments', []);
-                if ($currentComments !== [] || $nextComments !== []) {
+                if ($currentComments !== []) {
+                    continue;
+                }
+
+                if ($nextComments !== []) {
                     continue;
                 }
 
