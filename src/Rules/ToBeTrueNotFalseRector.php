@@ -95,7 +95,9 @@ CODE_SAMPLE
                 return true;
             }
 
-            $name = $this->getName($m['name']);
+            $nameValue = $m['name'];
+
+            $name = $nameValue instanceof Node ? $this->getName($nameValue) : $nameValue;
 
             return $name !== 'not';
         }));
