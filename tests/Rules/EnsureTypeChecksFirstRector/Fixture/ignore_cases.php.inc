@@ -5,3 +5,6 @@ expect($post)->toBeInstanceOf(Post::class)
     ->and($comment)->toBeInstanceOf(Comment::class);
 
 expect($a)->toBeInt()->toBe(10);
+
+expect($a)->not()->toBeNull();
+expect($a)->not->toBeNull();

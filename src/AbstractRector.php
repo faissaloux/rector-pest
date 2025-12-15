@@ -45,6 +45,10 @@ abstract class AbstractRector extends BaseAbstractRector implements DocumentedRu
             return $root;
         }
 
+        if ($root instanceof PropertyFetch && $root->var instanceof FuncCall && $this->isName($root->var, 'expect')) {
+            return $root->var;
+        }
+
         return null;
     }
 
@@ -83,12 +87,25 @@ abstract class AbstractRector extends BaseAbstractRector implements DocumentedRu
             $current = $current->var;
         }
 
-        if ($current instanceof FuncCall) {
-            return $current;
+        // Try to find an underlying FuncCall (expect(...)) even if there are
+        // intermediate PropertyFetch nodes (e.g. ->not) whose var is a
+        // MethodCall. Walk down through property/method var links to locate
+        // the FuncCall if present.
+        $search = $current;
+        while ($search instanceof PropertyFetch || $search instanceof MethodCall) {
+            $search = $search->var;
+        }
+
+        if ($search instanceof FuncCall) {
+            return $search;
         }
 
         if ($current instanceof PropertyFetch && $current->var instanceof FuncCall) {
             return $current->var;
+        }
+
+        if ($current instanceof FuncCall) {
+            return $current;
         }
 
         if ($current instanceof PropertyFetch) {
@@ -115,24 +132,39 @@ abstract class AbstractRector extends BaseAbstractRector implements DocumentedRu
     /**
      * Collect all method calls in a chain from root to leaf
      *
-     * @return array<array{name: Expr|Identifier|string, args: array<Arg|VariadicPlaceholder>}>
+     * @return array<array{name: Expr|Identifier|string, args: array<Arg|VariadicPlaceholder>, is_property?: bool}>
      */
     protected function collectChainMethods(MethodCall $methodCall): array
     {
         $methods = [];
         $current = $methodCall;
 
-        while ($current instanceof MethodCall) {
-            $methods[] = [
-                'name' => $current->name,
-                'args' => $current->args,
-            ];
+        while (true) {
+            if ($current instanceof MethodCall) {
+                $methods[] = [
+                    'name' => $current->name,
+                    'args' => $current->args,
+                    'is_property' => false,
+                ];
 
-            if ($current->var instanceof FuncCall || $current->var instanceof PropertyFetch) {
+                $next = $current->var;
+            } elseif ($current instanceof PropertyFetch) {
+                $methods[] = [
+                    'name' => $current->name,
+                    'args' => [],
+                    'is_property' => true,
+                ];
+
+                $next = $current->var;
+            } else {
                 break;
             }
 
-            $current = $current->var;
+            if ($next instanceof FuncCall) {
+                break;
+            }
+
+            $current = $next;
         }
 
         return array_reverse($methods);
@@ -141,14 +173,18 @@ abstract class AbstractRector extends BaseAbstractRector implements DocumentedRu
     /**
      * Rebuild a method chain from a base expression
      *
-     * @param array<array{name: Expr|Identifier|string, args: array<Arg|VariadicPlaceholder>}> $methods
+     * @param array<array{name: Expr|Identifier|string, args: array<Arg|VariadicPlaceholder>, is_property?: bool}> $methods
      */
     protected function rebuildMethodChain(Expr $base, array $methods): Expr
     {
         $result = $base;
 
         foreach ($methods as $method) {
-            $result = new MethodCall($result, $method['name'], $method['args']);
+            if (! empty($method['is_property'])) {
+                $result = new PropertyFetch($result, $method['name']);
+            } else {
+                $result = new MethodCall($result, $method['name'], $method['args']);
+            }
         }
 
         return $result;

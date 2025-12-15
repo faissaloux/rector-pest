@@ -92,14 +92,12 @@ CODE_SAMPLE
                 continue;
             }
 
-            if ($this->hasNotModifier($methodCall)) {
-                continue;
-            }
 
             $methods = $this->collectChainMethods($methodCall);
             if ($methods === []) {
                 continue;
             }
+
 
             // Reorder type matchers before non-type matchers within each segment
             // separated by `and` calls. Preserve `and` methods and their args.
@@ -225,7 +223,22 @@ CODE_SAMPLE
             }
 
             if ($needsReorder) {
-                foreach (array_merge($partitioned['type'], $partitioned['non_type']) as $m) {
+                // Place property fetches (e.g. ->not) before type matchers,
+                // then the remaining non-type methods.
+                // treat any `not` (property or method) as a prefix to type matchers
+                $propertyEntries = array_values(array_filter($partitioned['non_type'], function (array $m): bool {
+                    $nameValue = $m['name'];
+                    $name = $nameValue instanceof Node ? $this->getName($nameValue) : $nameValue;
+                    return $name === 'not';
+                }));
+
+                $otherNonType = array_values(array_filter($partitioned['non_type'], function (array $m): bool {
+                    $nameValue = $m['name'];
+                    $name = $nameValue instanceof Node ? $this->getName($nameValue) : $nameValue;
+                    return $name !== 'not';
+                }));
+
+                foreach (array_merge($propertyEntries, $partitioned['type'], $otherNonType) as $m) {
                     $result[] = $m;
                 }
             } else {
