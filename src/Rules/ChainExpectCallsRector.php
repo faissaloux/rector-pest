@@ -185,8 +185,8 @@ CODE_SAMPLE
         $exprStmt->expr = $this->buildChainedCall($first, $second);
 
         // preserve comments from the removed statement(s)
-        $collectedComments = $exprStmt->getAttribute('comments', []);
-        $collectedComments = array_merge($collectedComments, $nextExprStmt->getAttribute('comments', []));
+        $collectedComments = (array) $exprStmt->getAttribute('comments', []);
+        $collectedComments = array_merge($collectedComments, (array) $nextExprStmt->getAttribute('comments', []));
 
         unset($stmts[$key + 1]);
         $stmts = array_values($stmts);
@@ -219,7 +219,7 @@ CODE_SAMPLE
 
         $collectIndex = $key + 1;
         $allSecondMethods = [];
-        $collectedComments = $exprStmt->getAttribute('comments', []);
+        $collectedComments = (array) $exprStmt->getAttribute('comments', []);
 
         while (isset($stmts[$collectIndex])) {
             $currStmt = $stmts[$collectIndex];
@@ -251,7 +251,7 @@ CODE_SAMPLE
             $allSecondMethods = array_merge($allSecondMethods, $methods);
 
             // collect comments from statements we are removing
-            $collectedComments = array_merge($collectedComments, $currStmt->getAttribute('comments', []));
+            $collectedComments = array_merge($collectedComments, (array) $currStmt->getAttribute('comments', []));
 
             unset($stmts[$collectIndex]);
             $collectIndex++;
