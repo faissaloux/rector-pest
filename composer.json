@@ -59,6 +59,7 @@
           "pint"
         ],
         "test:lint": [
+          "rector --dry-run",
           "pint --test"
         ],
         "test:types": "phpstan analyse --ansi",

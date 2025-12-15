@@ -8,6 +8,7 @@ use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Identifier;
 use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\VariadicPlaceholder;
 use Rector\PhpParser\Enum\NodeGroup;
@@ -63,9 +64,6 @@ CODE_SAMPLE
         return NodeGroup::STMTS_AWARE;
     }
 
-    /**
-     * @param Node&object $node
-     */
     public function refactor(Node $node): ?Node
     {
         if (! property_exists($node, 'stmts') || $node->stmts === null) {
@@ -103,16 +101,17 @@ CODE_SAMPLE
                 continue;
             }
 
-            $partitioned = $this->partitionTypeAndNonType($methods);
+            // Reorder type matchers before non-type matchers within each segment
+            // separated by `and` calls. Preserve `and` methods and their args.
+            $newMethods = $this->reorderWithinAndSegments($methods);
 
-            // if any type method appears after a non-type method, reorder within the same chain
-            if ($this->needsReorderWithin($methods, $partitioned)) {
+            // if methods changed, rebuild chain
+            if ($newMethods !== $methods) {
                 $root = $this->getExpectChainRoot($methodCall);
                 if (! $root instanceof Expr) {
                     continue;
                 }
 
-                $newMethods = array_merge($partitioned['type'], $partitioned['non_type']);
                 $stmt->expr = $this->rebuildMethodChain($root, $newMethods);
                 $hasChanged = true;
                 continue;
@@ -154,8 +153,8 @@ CODE_SAMPLE
     /**
      * Partition collected methods into type vs non-type preserving original order
      *
-     * @param array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}> $methods
-     * @return array{type: array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}>, non_type: array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}>}
+     * @param array<array{name: Expr|Identifier|string, args: array<Arg|VariadicPlaceholder>}> $methods
+     * @return array{type: array<array{name: Expr|Identifier|string, args: array<Arg|VariadicPlaceholder>}>, non_type: array<array{name: Expr|Identifier|string, args: array<Arg|VariadicPlaceholder>}>}
      */
     private function partitionTypeAndNonType(array $methods): array
     {
@@ -181,47 +180,84 @@ CODE_SAMPLE
         return ['type' => $type, 'non_type' => $nonType];
     }
 
-    /**
-     * Determine if the original ordering requires reordering within the same chain
-     *
-     * @param array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}> $orig
-     * @param array{type: array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}>, non_type: array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}>} $partitioned
-     */
-    private function needsReorderWithin(array $orig, array $partitioned): bool
-    {
-        if ($partitioned['type'] === [] || $partitioned['non_type'] === []) {
-            return false;
-        }
-
-        // if a type matcher appears after a non-type matcher in original order => reorder
-        $foundNonType = false;
-        foreach ($orig as $m) {
-            $nameValue = $m['name'];
-            if ($nameValue instanceof Node) {
-                $name = $this->getName($nameValue);
-            } else {
-                // $nameValue is string
-                $name = $nameValue;
-            }
-
-            if ($name === null) {
-                continue;
-            }
-
-            if ($this->isTypeMatcherName($name)) {
-                if ($foundNonType) {
-                    return true;
-                }
-            } else {
-                $foundNonType = true;
-            }
-        }
-
-        return false;
-    }
-
     private function isTypeMatcherName(string $name): bool
     {
         return in_array($name, self::$typeMatchers, true);
+    }
+
+    /**
+     * Reorder type matchers inside each segment separated by `and`.
+     * Returns the new flattened methods list (root->leaf order).
+     *
+     * @param array<array{name: Expr|Identifier|string, args: array<Arg|VariadicPlaceholder>}> $methods
+     * @return array<array{name: Expr|Identifier|string, args: array<Arg|VariadicPlaceholder>}>
+     */
+    private function reorderWithinAndSegments(array $methods): array
+    {
+        $result = [];
+        /** @var array<array{name: Expr|Identifier|string, args: array<Arg|VariadicPlaceholder>}> $segment */
+        $segment = [];
+
+        $flushSegment = function () use (&$segment, &$result): void {
+            // Process the current segment
+            $partitioned = $this->partitionTypeAndNonType($segment);
+
+            // Check if we need to reorder: type matcher after non-type matcher
+            $needsReorder = false;
+            $hasType = $partitioned['type'] !== [];
+            $hasNonType = $partitioned['non_type'] !== [];
+
+            if ($hasType && $hasNonType) {
+                $foundNonType = false;
+                foreach ($segment as $m) {
+                    $nameValue = $m['name'];
+                    $name = $nameValue instanceof Node ? $this->getName($nameValue) : $nameValue;
+
+                    if ($name !== null && $this->isTypeMatcherName($name)) {
+                        if ($foundNonType) {
+                            $needsReorder = true;
+                            break;
+                        }
+                    } else {
+                        $foundNonType = true;
+                    }
+                }
+            }
+
+            if ($needsReorder) {
+                foreach (array_merge($partitioned['type'], $partitioned['non_type']) as $m) {
+                    $result[] = $m;
+                }
+            } else {
+                foreach ($segment as $m) {
+                    $result[] = $m;
+                }
+            }
+
+            $segment = [];
+        };
+
+        foreach ($methods as $m) {
+            $nameValue = $m['name'];
+            $name = $nameValue instanceof Node ? $this->getName($nameValue) : $nameValue;
+
+            if ($name === 'and') {
+                // finish current segment, then add the `and` method itself
+                if ($segment !== []) {
+                    $flushSegment();
+                }
+
+                $result[] = $m;
+                continue;
+            }
+
+            $segment[] = $m;
+        }
+
+        if ($segment !== []) {
+            $flushSegment();
+        }
+
+        return $result;
     }
 }
