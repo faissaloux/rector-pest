@@ -91,6 +91,9 @@ CODE_SAMPLE
 
         $methods = $this->collectChainMethods($methodCall);
 
+        // remove any property fetch entries (e.g. ->not) before rebuilding
+        $methods = array_values(array_filter($methods, fn($m) => empty($m['is_property'])));
+
         if ($methods !== []) {
             $lastIndex = count($methods) - 1;
             $methods[$lastIndex] = [
