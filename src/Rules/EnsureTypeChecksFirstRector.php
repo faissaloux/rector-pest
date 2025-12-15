@@ -103,22 +103,17 @@ CODE_SAMPLE
                 continue;
             }
 
-            // do not attempt to reorder within chains that use ->and(),
-            // since ->and() introduces a new subject and should be left intact
-            if ($this->containsAndMethod($methods)) {
-                continue;
-            }
+            // Reorder type matchers before non-type matchers within each segment
+            // separated by `and` calls. Preserve `and` methods and their args.
+            $newMethods = $this->reorderWithinAndSegments($methods);
 
-            $partitioned = $this->partitionTypeAndNonType($methods);
-
-            // if any type method appears after a non-type method, reorder within the same chain
-            if ($this->needsReorderWithin($methods, $partitioned)) {
+            // if methods changed, rebuild chain
+            if ($newMethods !== $methods) {
                 $root = $this->getExpectChainRoot($methodCall);
                 if (! $root instanceof Expr) {
                     continue;
                 }
 
-                $newMethods = array_merge($partitioned['type'], $partitioned['non_type']);
                 $stmt->expr = $this->rebuildMethodChain($root, $newMethods);
                 $hasChanged = true;
                 continue;
@@ -232,12 +227,36 @@ CODE_SAMPLE
     }
 
     /**
-     * Detect if any method in the collected chain is the `and` method.
+     * Reorder type matchers inside each segment separated by `and`.
+     * Returns the new flattened methods list (root->leaf order).
      *
      * @param array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}> $methods
+     * @return array<array{name: Expr|\PhpParser\Node\Identifier|string, args: array<Arg|VariadicPlaceholder>}>
      */
-    private function containsAndMethod(array $methods): bool
+    private function reorderWithinAndSegments(array $methods): array
     {
+        $result = [];
+        $segment = [];
+
+        $flushSegment = function () use (&$segment, &$result) {
+            if ($segment === []) {
+                return;
+            }
+
+            $partitioned = $this->partitionTypeAndNonType($segment);
+            if ($this->needsReorderWithin($segment, $partitioned)) {
+                foreach (array_merge($partitioned['type'], $partitioned['non_type']) as $m) {
+                    $result[] = $m;
+                }
+            } else {
+                foreach ($segment as $m) {
+                    $result[] = $m;
+                }
+            }
+
+            $segment = [];
+        };
+
         foreach ($methods as $m) {
             $nameValue = $m['name'];
             if ($nameValue instanceof Node) {
@@ -247,10 +266,17 @@ CODE_SAMPLE
             }
 
             if ($name === 'and') {
-                return true;
+                // finish current segment, then add the `and` method itself
+                $flushSegment();
+                $result[] = $m;
+                continue;
             }
+
+            $segment[] = $m;
         }
 
-        return false;
+        $flushSegment();
+
+        return $result;
     }
 }
