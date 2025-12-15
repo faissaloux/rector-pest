@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Rector\Config\RectorConfig;
-use RectorPest\Rules\ChainExpectCallsRector;
+// use RectorPest\Rules\ChainExpectCallsRector;
 use RectorPest\Rules\EnsureTypeChecksFirstRector;
 use RectorPest\Rules\SimplifyComparisonExpectationsRector;
 use RectorPest\Rules\SimplifyExpectNotRector;
