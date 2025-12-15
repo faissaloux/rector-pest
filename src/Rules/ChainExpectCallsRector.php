@@ -128,6 +128,13 @@ CODE_SAMPLE
                     continue;
                 }
 
+                // don't merge across comments — preserve explicit separation
+                $currentComments = (array) $stmt->getAttribute('comments', []);
+                $nextComments = (array) $nextStmt->getAttribute('comments', []);
+                if ($currentComments !== [] || $nextComments !== []) {
+                    continue;
+                }
+
                 // same variable: merge methods into a single expect() chain
                 if ($this->nodeComparator->areNodesEqual($firstExpectArg, $nextExpectArg)) {
                     $this->mergeSameVariable($stmts, $key);
@@ -225,6 +232,12 @@ CODE_SAMPLE
             $currStmt = $stmts[$collectIndex];
 
             if (! $currStmt instanceof Expression) {
+                break;
+            }
+
+            // stop merging further when there are comments on this statement
+            $currComments = (array) $currStmt->getAttribute('comments', []);
+            if ($currComments !== []) {
                 break;
             }
 
