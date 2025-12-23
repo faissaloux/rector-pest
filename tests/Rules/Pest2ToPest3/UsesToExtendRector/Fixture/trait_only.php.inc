@@ -1,6 +1,6 @@
 <?php
 
-use Tests\Rules\Pest2ToPest3\UsesToExtendRector\Fixture\SampleTrait;
+use Tests\Fixture\SampleTrait;
 
 // Trait should be converted to use()
 pest()->uses(SampleTrait::class);
@@ -9,7 +9,7 @@ pest()->uses(SampleTrait::class);
 -----
 <?php
 
-use Tests\Rules\Pest2ToPest3\UsesToExtendRector\Fixture\SampleTrait;
+use Tests\Fixture\SampleTrait;
 
 // Trait should be converted to use()
 pest()->use(SampleTrait::class);

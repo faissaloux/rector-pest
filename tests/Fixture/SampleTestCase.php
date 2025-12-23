@@ -1,10 +1,12 @@
 <?php
 
-namespace Tests\Rules\Pest2ToPest3\UsesToExtendRector\Fixture;
+namespace Tests\Fixture;
 
 use PHPUnit\Framework\TestCase as BaseTestCase;
 
-// Test class for fixture
+/**
+ * Sample test case class for use in Rector fixture tests.
+ */
 class SampleTestCase extends BaseTestCase
 {
 }
