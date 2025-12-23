@@ -28,7 +28,8 @@ final class UsesToExtendRector extends AbstractRector
 {
     public function __construct(
         private readonly ReflectionProvider $reflectionProvider
-    ) {}
+    ) {
+    }
 
     public function getRuleDefinition(): RuleDefinition
     {
@@ -66,7 +67,7 @@ CODE_SAMPLE
         // We only want to process the outermost method call of a pest()->uses() chain
         // Find uses() in the chain
         $usesCall = $this->findUsesCallInChain($node);
-        if ($usesCall === null) {
+        if (!$usesCall instanceof MethodCall) {
             return null;
         }
 
@@ -79,17 +80,17 @@ CODE_SAMPLE
         // Skip if this node IS NOT the outermost - check if parent has this as var
         // We handle this by only processing when uses() IS the current node OR
         // when current node is the outermost of a uses chain
-        
-        // For direct uses() call: pest()->uses(X) 
+
+        // For direct uses() call: pest()->uses(X)
         if ($this->isName($node->name, 'uses') && $this->isPestChain($node)) {
-            return $this->transformUsesCall($node, $node, []);
+            return $this->transformUsesCall($node, []);
         }
 
         // For chained: pest()->uses(X)->in('Feature') - only process the outermost
         if ($this->hasUsesInChain($node)) {
             // Collect the method chain from node back to uses()
             $methodsAfter = $this->collectMethodsUntilUses($node);
-            return $this->transformUsesCall($node, $usesCall, $methodsAfter);
+            return $this->transformUsesCall($usesCall, $methodsAfter);
         }
 
         return null;
@@ -109,11 +110,12 @@ CODE_SAMPLE
     private function hasUsesInChain(MethodCall $node): bool
     {
         $current = $node->var;
-        
+
         while ($current instanceof MethodCall) {
             if ($this->isName($current->name, 'uses') && $this->isPestChain($current)) {
                 return true;
             }
+
             $current = $current->var;
         }
 
@@ -132,11 +134,12 @@ CODE_SAMPLE
 
         // Search in the var chain
         $current = $node->var;
-        
+
         while ($current instanceof MethodCall) {
             if ($this->isName($current->name, 'uses') && $this->isPestChain($current)) {
                 return $current;
             }
+
             $current = $current->var;
         }
 
@@ -157,6 +160,7 @@ CODE_SAMPLE
             if ($this->isName($current->name, 'uses')) {
                 break;
             }
+
             $methods[] = [
                 'name' => $current->name,
                 'args' => $current->args,
@@ -173,7 +177,7 @@ CODE_SAMPLE
      *
      * @param array<array{name: Identifier|Expr, args: array<Arg|VariadicPlaceholder>}> $methodsAfter
      */
-    private function transformUsesCall(MethodCall $outermost, MethodCall $usesCall, array $methodsAfter): ?Node
+    private function transformUsesCall(MethodCall $usesCall, array $methodsAfter): ?Node
     {
         if ($usesCall->args === []) {
             return null;

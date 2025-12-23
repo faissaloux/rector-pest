@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Tests\Fixture;
 
 /**
@@ -7,5 +9,7 @@ namespace Tests\Fixture;
  */
 trait AnotherSampleTrait
 {
-    public function anotherSampleTraitMethod(): void {}
+    public function anotherSampleTraitMethod(): void
+    {
+    }
 }
