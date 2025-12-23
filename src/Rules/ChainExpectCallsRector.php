@@ -58,6 +58,7 @@ CODE_SAMPLE
             ]
         );
     }
+
     // @codeCoverageIgnoreEnd
 
     /**

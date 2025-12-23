@@ -62,6 +62,7 @@ CODE_SAMPLE
             ]
         );
     }
+
     // @codeCoverageIgnoreEnd
 
     /**

@@ -40,6 +40,7 @@ CODE_SAMPLE
             ]
         );
     }
+
     // @codeCoverageIgnoreEnd
 
     /**
