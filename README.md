@@ -1,3 +1,5 @@
+# Check official [Rector Plugin](https://github.com/pestphp/pest-plugin-rector)
+
 # Rector Pest
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mrpunyapal/rector-pest.svg?style=flat-square)](https://packagist.org/packages/mrpunyapal/rector-pest)
